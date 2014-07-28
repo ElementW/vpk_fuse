@@ -5,6 +5,19 @@ A FUSE filesystem which can open Valve PacKage files (VPK).
 
 Supports both VPKv1 and VPKv2, including splitted VPKs (separate archive files)
 
+Compiling
+----
+
+What you need:
+ - `make`
+ - A `gcc` version that supports GNU C99
+ - `pkg-config`
+ - FUSE headers, `libfuse-dev` package on Debian-based systems, or simply `fuse` on Arch Linux. For other OSes, just make sure the headers exist and are correctly pointed to by `pkg-config`
+
+How to build (caution: extremely hard):
+ 1. `git clone --depth 1 git@github.com:gravgun/vpk_fuse.git && cd vpk_fuse && make`
+ 2. Done.
+
 Usage
 ----
 
