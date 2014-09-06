@@ -479,6 +479,10 @@ static int vpk_read(const char *path, char *buf, size_t size, off_t offset,
 	if (ent->IsDirectory)
 		return -EISDIR;
 	File *f = ent->Data;
+	if (offset >= f->Size) {
+		LogW("Read offset %d exceeds file size %d on \"%s\"", offset, f->Size, path);
+		return 0;
+	}
 	size_t pos = offset, end = min(offset+size, f->Size);
 
 	if (f->PreloadSize > 0 && pos < f->PreloadSize) {
@@ -488,6 +492,7 @@ static int vpk_read(const char *path, char *buf, size_t size, off_t offset,
 			LogE("%s: preload read failed: %d/%d", path, read, readsize);
 			return -EIO;
 		}
+		//LogD("Preread %d/%d out of %d total", read, readsize, size);
 		pos += read;
 	}
 	
@@ -503,6 +508,7 @@ static int vpk_read(const char *path, char *buf, size_t size, off_t offset,
 			LogE("%s: data read failed: %d/%d", path, read, readsize);
 			return -EIO;
 		}
+		//LogD("Read %d/%d out of %d total (%d, %d)", read, readsize, size, end, pos);
 		pos += read;
 	}
 	
