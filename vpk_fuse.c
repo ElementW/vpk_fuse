@@ -12,8 +12,14 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>. */
-#define VERSION_STRING "1.0"
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+Version history:
+1.0: initial release
+1.01: fixed bug where vpk_fuse would hang if read offset > file size
+1.02: fixed opening single-VPK archives ("addon vpks")
+*/
+#define VERSION_STRING "1.02"
 
 #define FUSE_USE_VERSION 26
 #include <fuse.h>
@@ -362,7 +368,7 @@ void AddVPKFile(const char *const path, const char *const fname,
 	f.PreloadSize = dirEnt->PreloadBytes;
 	f.PreloadOffset = (f.PreloadSize > 0) ? off : 0;
 	f.ArchiveIndex = dirEnt->ArchiveIndex;
-	if (f.ArchiveIndex >= vpk.ArchiveFDCount) vpk.ArchiveFDCount = f.ArchiveIndex+1;
+	if (f.ArchiveIndex != 32767 && f.ArchiveIndex >= vpk.ArchiveFDCount) vpk.ArchiveFDCount = f.ArchiveIndex+1;
 	f.DataSize = dirEnt->EntryLength;
 	f.DataOffset = (f.DataSize) ? (((f.ArchiveIndex == 0x7fff) ? vpk.DataOffset : 0) + dirEnt->EntryOffset) : 0;
 	char fnbuf[2048];
