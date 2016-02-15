@@ -1,4 +1,4 @@
-CFLAGS += -std=gnu99 -g
+CFLAGS += -Wall -Wextra -std=c99 -g
 CFLAGS += $(shell pkg-config --cflags fuse)
 LDFLAGS += $(shell pkg-config --libs fuse)
 

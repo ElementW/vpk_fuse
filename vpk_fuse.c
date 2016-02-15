@@ -21,14 +21,16 @@ Version history:
 */
 #define VERSION_STRING "1.02"
 
+#define _XOPEN_SOURCE 600
 #define FUSE_USE_VERSION 26
+#include <errno.h>
 #include <fuse.h>
-#include <stdlib.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <string.h>
-#include <errno.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #define nullptr ((void*)0)
 
@@ -106,13 +108,13 @@ typedef struct File {
 
 
 
-const static int VPKSig = 0x55aa1234;
+const unsigned int VPKSig = 0x55aa1234;
 VPK vpk;
 DirectoryEntry rootEntry;
 Directory root;
 
 DirectoryEntry* GetEntryIn(const Directory* const dir, const char *const name) {
-	for (int i=0; i < dir->EntryCount; i++) {
+	for (unsigned int i = 0; i < dir->EntryCount; i++) {
 		if (strcmp(dir->Entries[i].Name, name) == 0)
 			return &dir->Entries[i];
 	}
@@ -242,7 +244,7 @@ void DestructFileEntry(const DirectoryEntry *const ent) {
 void DestructDirectoryEntry(const DirectoryEntry *const ent, bool notroot) {
 	free(ent->Name);
 	Directory *dir = ent->Data;
-	for (int i=0; i < dir->EntryCount; i++) {
+	for (unsigned int i = 0; i < dir->EntryCount; i++) {
 		if (dir->Entries[i].IsDirectory)
 			DestructDirectoryEntry(&dir->Entries[i], true);
 		else
@@ -454,7 +456,7 @@ static int vpk_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	filler(buf, ".", NULL, 0);
 	filler(buf, "..", NULL, 0);
 	struct stat stat; memset(&stat, 0, sizeof(struct stat));
-	for (int i=0; i < dir->EntryCount; i++) {
+	for (unsigned int i = 0; i < dir->EntryCount; i++) {
 		stat.st_ino = dir->Entries[i].ID;
 		stat.st_mode = 555 | (dir->Entries[i].IsDirectory ? S_IFDIR : S_IFREG);
 		filler(buf, dir->Entries[i].Name, &stat, 0);
@@ -485,8 +487,8 @@ static int vpk_read(const char *path, char *buf, size_t size, off_t offset,
 	if (ent->IsDirectory)
 		return -EISDIR;
 	File *f = ent->Data;
-	if (offset >= f->Size) {
-		LogW("Read offset %d exceeds file size %d on \"%s\"", offset, f->Size, path);
+	if ((uint64) offset >= f->Size) {
+		LogW("Read offset %"PRIu64" exceeds file size %"PRIu64" on \"%s\"", (uint64) offset, f->Size, path);
 		return 0;
 	}
 	size_t pos = offset, end = min(offset+size, f->Size);
@@ -519,7 +521,7 @@ static int vpk_read(const char *path, char *buf, size_t size, off_t offset,
 	}
 	
 	if (pos != end) {
-		LogE("%s: read failed: %d/%d (A#%d, FD%d)", path, pos-offset, size, f->ArchiveIndex, GetVPKArchive(&vpk, f->ArchiveIndex));
+		LogE("%s: read failed: %"PRIu64"/%"PRIu64" (A#%d, FD%d)", path, pos-offset, size, f->ArchiveIndex, GetVPKArchive(&vpk, f->ArchiveIndex));
 		return -EIO;
 	}
 	

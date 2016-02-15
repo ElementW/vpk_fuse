@@ -15,8 +15,9 @@ What you need:
  - FUSE headers, `libfuse-dev` package on Debian-based systems, or simply `fuse` on Arch Linux. For other OSes, just make sure the headers exist and are correctly pointed to by `pkg-config`
 
 How to build (caution: extremely hard):
- 1. `git clone --depth 1 git@github.com:gravgun/vpk_fuse.git && cd vpk_fuse && make`
- 2. Done.
+ 1. `git clone --depth 1 git@github.com:ElementW/vpk_fuse.git && cd vpk_fuse`
+ 2. `make`
+ 3. Done.
 
 Usage
 ----
