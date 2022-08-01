@@ -13,7 +13,7 @@
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>. */
-#define VERSION_STR "1.0"
+#define VERSION_STRING "1.0"
 
 #define FUSE_USE_VERSION 26
 #include <fuse.h>
