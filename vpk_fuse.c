@@ -1,5 +1,5 @@
 /*  vpk_fuse - FUSE filesystem to read VPK files
-    Copyright (C) 2014  Celeste "ElementW" Wouters
+    Copyright (C) 2019  Celeste "ElementW" Wouters
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -18,24 +18,28 @@ Version history:
 1.0: initial release
 1.01: fixed bug where vpk_fuse would hang if read offset > file size
 1.02: fixed opening single-VPK archives ("addon vpks")
+1.03: use realpath of archive and "vpk" as FUSE fsname and subtype, respectively
 */
-#define VERSION_STRING "1.02"
+#define VERSION_STRING "1.03"
 
-#define FUSE_USE_VERSION 26
+#define _XOPEN_SOURCE 600
+#define FUSE_USE_VERSION 31
+#include <errno.h>
 #include <fuse.h>
-#include <stdlib.h>
+#include <inttypes.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <string.h>
-#include <errno.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #define nullptr ((void*)0)
 
 typedef uint64_t uint64;
 
-#define LogE(...) {printf("\e[31mError:\e[39m ");printf(__VA_ARGS__);puts("");}
-#define LogW(...) {printf("\e[33mWarning:\e[39m ");printf(__VA_ARGS__);puts("");}
+#define LogE(...) {printf("\033[31mError:\033[39m ");printf(__VA_ARGS__);puts("");}
+#define LogW(...) {printf("\033[33mWarning:\033[39m ");printf(__VA_ARGS__);puts("");}
 #define LogD(...) {printf(__VA_ARGS__);puts("");}
 
 typedef struct VPKHeader {
@@ -106,13 +110,13 @@ typedef struct File {
 
 
 
-const static int VPKSig = 0x55aa1234;
+const unsigned int VPKSig = 0x55aa1234;
 VPK vpk;
 DirectoryEntry rootEntry;
 Directory root;
 
 DirectoryEntry* GetEntryIn(const Directory* const dir, const char *const name) {
-	for (int i=0; i < dir->EntryCount; i++) {
+	for (unsigned int i = 0; i < dir->EntryCount; i++) {
 		if (strcmp(dir->Entries[i].Name, name) == 0)
 			return &dir->Entries[i];
 	}
@@ -242,7 +246,7 @@ void DestructFileEntry(const DirectoryEntry *const ent) {
 void DestructDirectoryEntry(const DirectoryEntry *const ent, bool notroot) {
 	free(ent->Name);
 	Directory *dir = ent->Data;
-	for (int i=0; i < dir->EntryCount; i++) {
+	for (unsigned int i = 0; i < dir->EntryCount; i++) {
 		if (dir->Entries[i].IsDirectory)
 			DestructDirectoryEntry(&dir->Entries[i], true);
 		else
@@ -454,7 +458,7 @@ static int vpk_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	filler(buf, ".", NULL, 0);
 	filler(buf, "..", NULL, 0);
 	struct stat stat; memset(&stat, 0, sizeof(struct stat));
-	for (int i=0; i < dir->EntryCount; i++) {
+	for (unsigned int i = 0; i < dir->EntryCount; i++) {
 		stat.st_ino = dir->Entries[i].ID;
 		stat.st_mode = 555 | (dir->Entries[i].IsDirectory ? S_IFDIR : S_IFREG);
 		filler(buf, dir->Entries[i].Name, &stat, 0);
@@ -485,8 +489,8 @@ static int vpk_read(const char *path, char *buf, size_t size, off_t offset,
 	if (ent->IsDirectory)
 		return -EISDIR;
 	File *f = ent->Data;
-	if (offset >= f->Size) {
-		LogW("Read offset %d exceeds file size %d on \"%s\"", offset, f->Size, path);
+	if ((uint64) offset >= f->Size) {
+		LogW("Read offset %"PRIu64" exceeds file size %"PRIu64" on \"%s\"", (uint64) offset, f->Size, path);
 		return 0;
 	}
 	size_t pos = offset, end = min(offset+size, f->Size);
@@ -519,7 +523,7 @@ static int vpk_read(const char *path, char *buf, size_t size, off_t offset,
 	}
 	
 	if (pos != end) {
-		LogE("%s: read failed: %d/%d (A#%d, FD%d)", path, pos-offset, size, f->ArchiveIndex, GetVPKArchive(&vpk, f->ArchiveIndex));
+		LogE("%s: read failed: %"PRIu64"/%"PRIu64" (A#%d, FD%d)", path, pos-offset, size, f->ArchiveIndex, GetVPKArchive(&vpk, f->ArchiveIndex));
 		return -EIO;
 	}
 	
@@ -539,18 +543,20 @@ int main(int argc, char *argv[]) {
 		printf("Usage: %s <filename> [FUSE flags] <FUSE mountpoint>\n", argv[0]);
 		return 1;
 	}
+	char* path = realpath(argv[1], nullptr);
 	{
-		char* path = realpath(argv[1], nullptr);
+		
 		if (path == nullptr) {
 			LogE("Could not open '%s': %s", argv[1], strerror(errno));
+			free(path);
 			return 100;
 		}
 		LogD("Opening '%s'", path);
 		if ((vpk.FD = open(path, O_RDONLY)) == -1) {
 			LogE("Could not open '%s': %s", path, strerror(errno));
+			free(path);
 			return 101;
 		}
-		
 		int pathlen = strlen(path), pos = pathlen;
 		for (; pos > 0 && (pos-1>=0&&path[pos-1] != '/'); pos--);
 		vpk.Path = malloc(pos+1);
@@ -558,15 +564,16 @@ int main(int argc, char *argv[]) {
 		vpk.PathLen = pos;
 		vpk.FileName = strdup(path+pos);
 		vpk.FileNameLen = strlen(vpk.FileName);
-		free(path);
 	}
 	ReadVPKHeader(vpk.FD, &vpk.Header);
 	if (vpk.Header.Signature != VPKSig) {
 		LogE("Invalid VPK sigature (0x%X)", vpk.Header.Signature);
+		free(path);
 		return 200;
 	}
 	if (vpk.Header.Version < 1 || vpk.Header.Version > 2) {
 		LogE("Unsupported VPK version %d", vpk.Header.Version);
+		free(path);
 		return 201;
 	}
 	if (vpk.Header.Version == 2) {
@@ -580,15 +587,28 @@ int main(int argc, char *argv[]) {
 	int arch = OpenAllVPKArchives(&vpk);
 	if (arch != 0x7fff) {
 		LogE("Failed opening archive #%d", arch);
+		free(path);
 		return 300;
 	}
 	if (vpk.ArchiveFDCount > 0)
 		LogD("Opened all archives successfully");
-	
-	int fuseRet = fuse_main(argc-1, &argv[1], &vpk_operations, NULL);
+
+	char **argvFuse = malloc(sizeof(char*) * argc);
+	for (int i=1; i < argc; ++i) {
+		argvFuse[i - 1] = argv[i];
+	}
+	const char *addArgsFmt = "-osubtype=vpk,noatime,ro,fsname=%s";
+	argvFuse[argc - 1] = malloc(sizeof(char) * (strlen(addArgsFmt) + strlen(path)));
+	sprintf(argvFuse[argc - 1], addArgsFmt, path);
+	free(path);
+	int fuseRet = fuse_main(argc, argvFuse, &vpk_operations, NULL);
+	free(argvFuse[argc - 1]);
+	free(argvFuse);
 	close(vpk.FD);
-	for (int i=0; i < vpk.ArchiveFDCount; i++)
+	for (int i=0; i < vpk.ArchiveFDCount; i++) {
 		close(vpk.ArchiveFDs[i]);
+		LogD("Closing VPK archive #%d", vpk.ArchiveFDs[i]);
+	}
 	free(vpk.ArchiveFDs);
 	free(vpk.FileName);
 	free(vpk.Path);
