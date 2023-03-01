@@ -222,7 +222,7 @@ DirectoryEntry* AddDirectory(const char *const path, const char *const name) {
 	return AddEntry(path, &ent);
 }
 
-void InitFileSystem() {
+void InitFileSystem(void) {
 	rootEntry.IsDirectory = true;
 	rootEntry.Name = strdup("/");
 	rootEntry.Data = &root;
@@ -257,7 +257,7 @@ void DestructDirectoryEntry(const DirectoryEntry *const ent, bool notroot) {
 		free(dir);
 }
 
-void DestructFileSystem() {
+void DestructFileSystem(void) {
 	DestructDirectoryEntry(&rootEntry, false);
 }
 
