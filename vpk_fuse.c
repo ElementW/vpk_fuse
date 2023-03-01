@@ -265,7 +265,8 @@ char* ReadString(int fd) {
 	static char buf[512];
 	char c = 0; int count = 0;
 	while (true) {
-		read(fd, &c, 1);
+		if (read(fd, &c, 1) <= 0)
+			break;
 		if (c == 0)
 			break;
 		if (count < 512) // Discard the rest TODO: do better
@@ -278,15 +279,21 @@ char* ReadString(int fd) {
 }
 
 int ReadInt(int fd) {
-	int i; read(fd, &i, sizeof(int));
+	int i;
+	if (read(fd, &i, sizeof(int)) <= 0)
+		i = 0;
 	return i;
 }
 unsigned int ReadUInt(int fd) {
-	unsigned int i; read(fd, &i, sizeof(unsigned int));
+	unsigned int i;
+	if (read(fd, &i, sizeof(unsigned int)) <= 0)
+		i = 0;
 	return i;
 }
 unsigned short ReadUShort(int fd) {
-	unsigned short i; read(fd, &i, sizeof(unsigned short));
+	unsigned short i;
+	if (read(fd, &i, sizeof(unsigned short)) <= 0)
+		i = 0;
 	return i;
 }
 
