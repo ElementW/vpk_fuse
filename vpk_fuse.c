@@ -325,33 +325,22 @@ int OpenVPKArchive(VPK *const vpk, int id) {
 		size_t prefLen = strlen(prefix), suffLen = strlen(suffix);
 		size_t fnameLen = vpk->PathLen + prefLen + 3 + suffLen + 1;
 		char *fname = malloc(fnameLen);
-
-		// Suppress weird GCC warning that is treated as an error
-		#ifdef __GNUC__
-		#ifndef __clang__
-		#pragma GCC diagnostic push
-		#pragma GCC diagnostic ignored "-Wformat-truncation"
-		#endif
-		#endif
 		
 		// 3-len id
-		snprintf(fname, fnameLen, "%s%s%03d%s", vpk->Path, prefix, id % 1000u, suffix);
+		int written = snprintf(fname, fnameLen, "%s%s%03d%s", vpk->Path, prefix, id % 1000u, suffix);
 		if ((fd = open(fname, O_RDONLY)) != -1) goto OpenVPKArchiveEndTry;
 		
 		// 2-len id
-		snprintf(fname, fnameLen, "%s%s%02d%s", vpk->Path, prefix, id % 100u, suffix);
+		written = snprintf(fname, fnameLen, "%s%s%02d%s", vpk->Path, prefix, id % 100u, suffix);
 		if ((fd = open(fname, O_RDONLY)) != -1) goto OpenVPKArchiveEndTry;
-
-		#ifdef __GNUC__
-		#ifndef __clang__
-		#pragma GCC diagnostic pop
-		#endif
-		#endif
 		
 		// any-required-len id
-		snprintf(fname, fnameLen, "%s%s%d%s", vpk->Path, prefix, id, suffix);
+		written = snprintf(fname, fnameLen, "%s%s%d%s", vpk->Path, prefix, id, suffix);
 		if ((fd = open(fname, O_RDONLY)) != -1) goto OpenVPKArchiveEndTry;
 		
+		if ((size_t) written >= fnameLen) {
+			LogE("Filename too long for archive #%d", id);
+		}
 		LogE("Could not find a suitable file for archive #%d", id);
 		return -1;
 		
