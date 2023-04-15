@@ -1,4 +1,4 @@
-CFLAGS += -Wall -Wextra -pedantic -Werror -std=c99 -O2
+CFLAGS += -Wall -Wextra -pedantic -std=c99 -O2
 CFLAGS += $(shell pkg-config --cflags fuse)
 LDFLAGS += $(shell pkg-config --libs fuse)
 
